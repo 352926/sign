@@ -19,6 +19,27 @@ class Sign {
         $this->log_file = FCPATH . $this->log_file;
     }
 
+    protected function get_random_time($day = null) {
+        if (empty($day)) {
+            if (empty($this->today)) {
+                $today = date('Ymd');
+            } else {
+                $today = $this->today;
+            }
+        } else {
+            $today = $day;
+        }
+
+        $time_h = mt_rand(7, 23);
+        $time_h = $time_h < 10 ? "0{$time_h}" : $time_h;
+        $time_i = mt_rand(0, 59);
+        $time_i = $time_i < 10 ? "0{$time_i}" : $time_i;
+        $time_s = mt_rand(0, 59);
+        $time_s = $time_s < 10 ? "0{$time_s}" : $time_s;
+
+        return strtotime("{$today}{$time_h}{$time_i}{$time_s}");
+    }
+
     public function process() {
         if (!file_exists($this->lock_file)) {
             file_put_contents($this->lock_file, getmypid());
@@ -50,14 +71,8 @@ class Sign {
                     if (isset($this->sign_time[$today][$account['id']])) {
                         continue;
                     }
-                    $time_h = mt_rand(7, 23);
-                    $time_h = $time_h < 10 ? "0{$time_h}" : $time_h;
-                    $time_i = mt_rand(0, 59);
-                    $time_i = $time_i < 10 ? "0{$time_i}" : $time_i;
-                    $time_s = mt_rand(0, 59);
-                    $time_s = $time_s < 10 ? "0{$time_s}" : $time_s;
 
-                    $this->sign_time[$today][$account['id']] = strtotime("{$today}{$time_h}{$time_i}{$time_s}");
+                    $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
 
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
                     $this->logger("id:{$account['id']},title:[{$account['title']}] 计划签到时间：{$sign_time}");
@@ -96,7 +111,7 @@ class Sign {
                 }
 
                 if (!isset($this->sign_time[$today][$account['id']])) {
-                    $this->sign_time[$today][$account['id']] = time() + mt_rand(3, 10);
+                    $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
                     $this->logger("id:{$account['id']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}");
                 }
