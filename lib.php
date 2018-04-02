@@ -75,7 +75,7 @@ class Sign {
                     $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
 
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
-                    $this->logger("id:{$account['id']},title:[{$account['title']}] 计划签到时间：{$sign_time}");
+                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 计划签到时间：{$sign_time}");
                 }
 
             }
@@ -104,9 +104,9 @@ class Sign {
                                 $wx_send_rs = send_template($account['open_id'], "计划签到时间：{$sign_x_time}！", '心跳包发送失败', "\n请关注今日签到状况");
                             }
                             $result_json = json_encode($result, JSON_UNESCAPED_UNICODE);
-                            $this->logger("[id:{$account['id']},{$account['title']}] 发送心跳包 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
+                            $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 发送心跳包 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                         } else {
-                            $this->logger("[id:{$account['id']},{$account['title']}] 发送心跳包 成功!");
+                            $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 发送心跳包 成功!");
                         }
                     }
                 }
@@ -118,7 +118,7 @@ class Sign {
                 if (!isset($this->sign_time[$today][$account['id']])) {
                     $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
-                    $this->logger("id:{$account['id']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}");
+                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}");
                 }
 
                 if ($sign_record[$account['id']] !== true && time() > $this->sign_time[$today][$account['id']]) {
@@ -126,7 +126,7 @@ class Sign {
                     $result_json = json_encode($result, JSON_UNESCAPED_UNICODE);
                     if ($result->success) {
                         $sign_record[$account['id']] = true;
-                        $this->logger("[id:{$account['id']},{$account['title']}] 签到 成功!");
+                        $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!");
                     } else {
                         //失败不重试，直接设置成功。。。
                         $sign_record[$account['id']] = true;
@@ -135,7 +135,7 @@ class Sign {
                         if (isset($account['open_id'])) {
                             $wx_send_rs = send_template($account['open_id'], $result->message, '签到失败，如已签到请忽略', "\n请尽快手工自行签到，技术人员尽快修复！");
                         }
-                        $this->logger("[id:{$account['id']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
+                        $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                     }
                 }
             }
