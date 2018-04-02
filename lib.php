@@ -30,7 +30,7 @@ class Sign {
             $today = $day;
         }
 
-        $time_h = mt_rand(7, 23);
+        $time_h = mt_rand(7, 13);
         $time_h = $time_h < 10 ? "0{$time_h}" : $time_h;
         $time_i = mt_rand(0, 59);
         $time_i = $time_i < 10 ? "0{$time_i}" : $time_i;
@@ -97,9 +97,14 @@ class Sign {
                         //心跳启动。。。
                         $result = $this->heartbeat($account);
                         if (!$result->success) {
-                            //todo 发送微信通知》》》
+                            //发送微信通知》》》
+                            $wx_send_rs = '';
+                            if (isset($account['open_id'])) {
+                                $sign_x_time = date('H:i:s', $this->sign_time[$today][$account['id']]);
+                                $wx_send_rs = send_template($account['open_id'], "计划签到时间：{$sign_x_time}！", '心跳包发送失败', "\n请关注今日签到状况");
+                            }
                             $result_json = json_encode($result, JSON_UNESCAPED_UNICODE);
-                            $this->logger("[id:{$account['id']},{$account['title']}] 发送心跳包 失败,msg:{$result->message},result:{$result_json}");
+                            $this->logger("[id:{$account['id']},{$account['title']}] 发送心跳包 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                         } else {
                             $this->logger("[id:{$account['id']},{$account['title']}] 发送心跳包 成功!");
                         }
@@ -125,8 +130,12 @@ class Sign {
                     } else {
                         //失败不重试，直接设置成功。。。
                         $sign_record[$account['id']] = true;
-                        //todo 发送微信通知》》》
-                        $this->logger("[id:{$account['id']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json}");
+                        //发送微信通知》》》
+                        $wx_send_rs = '';
+                        if (isset($account['open_id'])) {
+                            $wx_send_rs = send_template($account['open_id'], $result->message, '签到失败，如已签到请忽略', "\n请尽快手工自行签到，技术人员尽快修复！");
+                        }
+                        $this->logger("[id:{$account['id']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                     }
                 }
             }
@@ -135,7 +144,6 @@ class Sign {
             sleep(1);
         } while (true);
     }
-
 
     protected function _curl_post($url, $post, $headers = array(), $raw = false) {
         $ch = curl_init($url);
@@ -235,7 +243,7 @@ class Sign {
 
         foreach ($account['check_result'] as $key => $value) {
             if (!isset($res[$key]) || $res[$key] != $value) {
-                $result->message = "sign key:{$key} is not set OR value not equal";
+                $result->message = "返回结果对照不一致 key:{$key}";
                 $result->result = $res_txt;
                 return $result;
             }
