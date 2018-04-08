@@ -133,7 +133,7 @@ class Sign {
                         //发送微信通知》》》
                         $wx_send_rs = '';
                         if (isset($account['open_id'])) {
-                            $wx_send_rs = send_template($account['open_id'], $result->message, '签到失败，如已签到请忽略', "\n请尽快手工自行签到，技术人员尽快修复！");
+                            $wx_send_rs = send_template($account['open_id'], $result->message, "签到失败，如已签到请忽略\n[可能已签过了]", "\n请尽快手工自行签到，技术人员尽快修复！");
                         }
                         $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                     }
@@ -243,7 +243,7 @@ class Sign {
 
         foreach ($account['check_result'] as $key => $value) {
             if (!isset($res[$key]) || $res[$key] != $value) {
-                $result->message = "返回结果对照不一致 key:{$key}";
+                $result->message = "返回结果对照不一致 {$key}:{$value}";
                 $result->result = $res_txt;
                 return $result;
             }
