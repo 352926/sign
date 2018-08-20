@@ -153,6 +153,8 @@ class Sign {
 
     public function collect() {
         $this->accounts = require 'account.php';
+        @unlink($this->diaoyuren_file_uids);
+        @unlink($this->diaoyuren_file_topics);
 
         foreach ($this->accounts as $account) {
             if ($account['id'] != 1) {
@@ -164,8 +166,8 @@ class Sign {
                 $uids = $this->diaoyuren_fetch_uids($res_txt);
                 $tids = $this->diaoyuren_fetch_tids($res_txt);
 
-                file_put_contents($this->diaoyuren_file_uids, implode(PHP_EOL, $uids) . PHP_EOL, FILE_APPEND);
-                file_put_contents($this->diaoyuren_file_topics, implode(PHP_EOL, $tids) . PHP_EOL, FILE_APPEND);
+                @file_put_contents($this->diaoyuren_file_uids, implode(PHP_EOL, $uids) . PHP_EOL, FILE_APPEND);
+                @file_put_contents($this->diaoyuren_file_topics, implode(PHP_EOL, $tids) . PHP_EOL, FILE_APPEND);
                 echo $i . " ok!\n";
                 usleep(mt_rand(100000, 1000000));
             }
