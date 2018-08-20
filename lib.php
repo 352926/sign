@@ -14,6 +14,12 @@ class Sign {
     protected $today = 0;
     protected $reload_config = 180;
 
+    protected $diaoyuren_followed = array();
+    protected $diaoyuren_liked = array();
+    protected $diaoyuren_collect_url = 'http://www.diaoyu.com/jiqiao/list-0-0-%d.html';
+    protected $diaoyuren_file_uids = 'uids.data';
+    protected $diaoyuren_file_topics = 'topics.data';
+
     public function __construct() {
         $this->lock_file = FCPATH . $this->lock_file;
         $this->log_file = FCPATH . $this->log_file;
@@ -143,6 +149,98 @@ class Sign {
             $i++;
             sleep(1);
         } while (true);
+    }
+
+    public function collect() {
+        $this->accounts = require 'account.php';
+
+        foreach ($this->accounts as $account) {
+            if ($account['id'] != 1) {
+                continue;
+            }
+
+            for ($i = 2; $i <= 602; $i++) {
+                $res_txt = $this->_curl_get(sprintf($this->diaoyuren_collect_url, $i), $account['header']);
+                $uids = $this->diaoyuren_fetch_uids($res_txt);
+                $tids = $this->diaoyuren_fetch_tids($res_txt);
+
+                file_put_contents($this->diaoyuren_file_uids, implode(PHP_EOL, $uids) . PHP_EOL, FILE_APPEND);
+                file_put_contents($this->diaoyuren_file_topics, implode(PHP_EOL, $tids) . PHP_EOL, FILE_APPEND);
+                echo $i . " ok!\n";
+                usleep(mt_rand(100000, 1000000));
+            }
+        }
+
+        echo "Done!\n";
+        die;
+    }
+
+    protected function diaoyuren_fetch_uids($content) {
+        // 正则匹配规则： http://www.diaoyu.com/user/7519924
+        $uids = array();
+        $rs = @preg_match_all("/http:\/\/www\.diaoyu\.com\/user\/(\d+)/si", $content, $matches);
+
+        if ($rs === false || empty($matches[1])) {
+            return $uids;
+        }
+
+        $uids = array_unique($matches[1]);
+
+        return $uids;
+    }
+
+    protected function diaoyuren_fetch_tids($content) {
+        // 正则匹配规则： http://bbs.diaoyu.com/showtopic-2722009-1-1.html
+        $tids = array();
+        $rs = @preg_match_all("/http:\/\/bbs\.diaoyu\.com\/showtopic\-(\d+)\-/si", $content, $matches);
+
+        if ($rs === false || empty($matches[1])) {
+            return $tids;
+        }
+
+        $tids = array_unique($matches[1]);
+
+        return $tids;
+    }
+
+    protected function diaoyuren_like($tid, $account) {
+        $url = "http://www.diaoyu.com/ajax/thread/like";
+
+        $raw = !empty($account['raw']) ? true : false;
+        $post = array(
+            'tid' => $tid
+        );
+        $res_txt = _curl_post($url, $post, $account['header'], $raw);
+        $res = json_decode($res_txt, true);
+
+        if ($res['code'] == '1') {
+            //恭喜,点赞成功
+            return true;
+        } elseif ($res['code'] == '-1') {
+            //你已经赞过它
+            return 0;
+        }
+        return false;
+    }
+
+    protected function diaoyuren_follow($uid, $account) {
+        $url = "http://www.diaoyu.com/ajax/user/follow";
+
+        $raw = !empty($account['raw']) ? true : false;
+        $post = array(
+            'follow_uid' => $uid
+        );
+        $res_txt = _curl_post($url, $post, $account['header'], $raw);
+        $res = json_decode($res_txt, true);
+
+        if ($res['code'] == '1') {
+            //关注成功
+            return true;
+        } elseif ($res['code'] == '-1') {
+            //您已经关注过TA
+            return 0;
+        }
+        return false;
     }
 
     protected function _curl_post($url, $post, $headers = array(), $raw = false) {
