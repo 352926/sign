@@ -86,7 +86,7 @@ class Sign {
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
-                        $his_sign_time = date('H:i:s', $sign_time);
+                        $his_sign_time = date('H:i:s', strtotime($sign_time));
                         $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
                         $wx_send_rs = json_encode($wx_send_rs);
                     }
@@ -135,7 +135,7 @@ class Sign {
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
-                        $his_sign_time = date('H:i:s', $sign_time);
+                        $his_sign_time = date('H:i:s', strtotime($sign_time));
                         $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
                         $wx_send_rs = json_encode($wx_send_rs);
                     }
