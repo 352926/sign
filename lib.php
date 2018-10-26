@@ -87,7 +87,7 @@ class Sign {
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
                         $his_sign_time = date('H:i:s', $sign_time);
-                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
                         $wx_send_rs = json_encode($wx_send_rs);
                     }
                     $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 计划签到时间：{$sign_time},send weixin:{$wx_send_rs}");
@@ -136,7 +136,7 @@ class Sign {
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
                         $his_sign_time = date('H:i:s', $sign_time);
-                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
                         $wx_send_rs = json_encode($wx_send_rs);
                     }
                     $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}，send weixin:{$wx_send_rs}");
@@ -150,7 +150,7 @@ class Sign {
                         $wx_send_rs = '';
                         if (isset($account['open_id'])) {
                             $day = (strtotime(date("Ymd", time() + 86400)) - strtotime(date('Ymd'))) / 86400;
-                            $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "打卡成功", "\n您已经连续签到{$day}天了");
+                            $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "自动签到", "打卡成功", date('Y-m-d H:i:s') . "\n您已连续签到{$day}天了");
                         }
                         $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!send weixin:{$wx_send_rs}");
 
