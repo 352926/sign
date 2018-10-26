@@ -59,6 +59,9 @@ class Sign {
             }
         }
 
+        $uids = @file($this->diaoyuren_file_uids);
+        $topics = @file($this->diaoyuren_file_topics);
+
         $i = 0;
 
         do {
@@ -81,7 +84,13 @@ class Sign {
                     $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
 
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
-                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 计划签到时间：{$sign_time}");
+                    $wx_send_rs = '';
+                    if (isset($account['open_id'])) {
+                        $his_sign_time = date('H:i:s', $sign_time);
+                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        $wx_send_rs = json_encode($wx_send_rs);
+                    }
+                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 计划签到时间：{$sign_time},send weixin:{$wx_send_rs}");
                 }
 
             }
@@ -107,7 +116,7 @@ class Sign {
                             $wx_send_rs = '';
                             if (isset($account['open_id'])) {
                                 $sign_x_time = date('H:i:s', $this->sign_time[$today][$account['id']]);
-                                $wx_send_rs = send_template($account['open_id'], "计划签到时间：{$sign_x_time}！", '心跳包发送失败', "\n请关注今日签到状况");
+                                $wx_send_rs = send_error($account['open_id'], "计划签到时间：{$sign_x_time}！", '心跳包发送失败', "\n请关注今日签到状况");
                             }
                             $result_json = json_encode($result, JSON_UNESCAPED_UNICODE);
                             $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 发送心跳包 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
@@ -124,7 +133,13 @@ class Sign {
                 if (!isset($this->sign_time[$today][$account['id']])) {
                     $this->sign_time[$today][$account['id']] = $this->get_random_time($today);
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
-                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}");
+                    $wx_send_rs = '';
+                    if (isset($account['open_id'])) {
+                        $his_sign_time = date('H:i:s', $sign_time);
+                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        $wx_send_rs = json_encode($wx_send_rs);
+                    }
+                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}，send weixin:{$wx_send_rs}");
                 }
 
                 if ($sign_record[$account['id']] !== true && time() > $this->sign_time[$today][$account['id']]) {
@@ -132,14 +147,56 @@ class Sign {
                     $result_json = json_encode($result, JSON_UNESCAPED_UNICODE);
                     if ($result->success) {
                         $sign_record[$account['id']] = true;
-                        $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!");
+                        $wx_send_rs = '';
+                        if (isset($account['open_id'])) {
+                            $day = (strtotime(date("Ymd", time() + 86400)) - strtotime(date('Ymd'))) / 86400;
+                            $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "打卡成功", "\n您已经连续签到{$day}天了");
+                        }
+                        $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!send weixin:{$wx_send_rs}");
+
+                        //id为自己的账号自动做 关注、点赞 任务
+                        if (false && $account['id'] == 1) {
+                            $follow_success = 0;
+                            foreach ($uids as $i => $uid) {
+                                //关注3个人就够了
+                                if ($follow_success >= 3) {
+                                    break;
+                                }
+                                $rs = $this->diaoyuren_follow($uid, $account);
+                                if ($rs === true) {
+                                    $follow_success++;
+                                    $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 关注 {$uid} 成功!");
+                                }
+                                unset($uids[$i]);
+                                usleep(mt_rand(100000, 1000000));
+                            }
+
+                            @file_put_contents($this->diaoyuren_file_uids, implode(PHP_EOL, $uids));
+
+                            //点赞
+                            $like_success = 0;
+                            foreach ($topics as $i => $tid) {
+                                //点赞超过10偏就退出
+                                if ($like_success >= 10) {
+                                    break;
+                                }
+                                $rs = $this->diaoyuren_like($tid, $account);
+                                if ($rs === true) {
+                                    $like_success++;
+                                    $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 点赞 {$tid} 成功!");
+                                }
+                                unset($topics[$i]);
+                                usleep(mt_rand(100000, 1000000));
+                            }
+                            @file_put_contents($this->diaoyuren_file_topics, implode(PHP_EOL, $topics));
+                        }
                     } else {
                         //失败不重试，直接设置成功。。。
                         $sign_record[$account['id']] = true;
                         //发送微信通知》》》
                         $wx_send_rs = '';
                         if (isset($account['open_id'])) {
-                            $wx_send_rs = send_template($account['open_id'], $result->message, "签到失败，如已签到请忽略\n[可能已签过了]", "\n请尽快手工自行签到，技术人员尽快修复！");
+                            $wx_send_rs = send_error($account['open_id'], $result->message, "签到失败，如已签到请忽略\n[可能已签过了]", "\n请尽快手工自行签到，技术人员尽快修复！");
                         }
                         $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 失败,msg:{$result->message},result:{$result_json},wx_send_rs:{$wx_send_rs}");
                     }
@@ -175,6 +232,39 @@ class Sign {
 
         echo "Done!\n";
         die;
+    }
+
+    public function fetch_user_info($show = false) {
+        $this->accounts = require 'account.php';
+        @unlink($this->diaoyuren_file_uids);
+        @unlink($this->diaoyuren_file_topics);
+
+        $userinfo = array();
+        foreach ($this->accounts as $account) {
+
+            if ($account['title'] == '钓鱼人app') {
+                $rs = $this->_curl_get('http://www.diaoyu.com/my/home', $account['header']);
+                @preg_match_all("/<div class=\"user-info-honor\"><span>等级：<i>([^<]*)<\/i><\/span><span>头衔：([^<]*)<\/span><\/div>/si", $rs, $matches);
+                $level = @$matches[1][0];
+                $level_title = @$matches[2][0];
+
+                @preg_match_all("/<p class=\"user-info-name\">([^<]*)<\/p>/si", $rs, $matches);
+                //print_r($matches);
+                $user = @$matches[1][0];
+                @preg_match_all("/<ul class=\"user-info-award\">(.*?)<\/ul>/si", $rs, $matches);
+                //print_r($matches[1][0]);
+                //print_r($matches[1][0]);
+                @preg_match_all("/<p>(\d*)<\/p>/si", $matches[1][0], $all);
+                $point = @$all[1][0];
+                $gold = @$all[1][1];
+                if ($show) {
+                    echo "用户：{$user}\n等级：{$level}，头衔：{$level_title}，金币：{$gold}，积分：{$point}\n===============\n";
+                }
+                $userinfo[$account['id']] = array('name' => $user, 'level' => $level, 'level_title' => $level_title, 'gold' => $gold, 'point' => $point);
+            }
+
+        }
+        return $userinfo;
     }
 
     protected function diaoyuren_fetch_uids($content) {
