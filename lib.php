@@ -86,9 +86,9 @@ class Sign {
                     $sign_time = date('Y-m-d H:i:s', $this->sign_time[$today][$account['id']]);
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
-                        $his_sign_time = date('H:i:s', strtotime($sign_time));
-                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
-                        $wx_send_rs = json_encode($wx_send_rs);
+                        #$his_sign_time = date('H:i:s', strtotime($sign_time));
+                        #$wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        #$wx_send_rs = json_encode($wx_send_rs);
                     }
                     $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 计划签到时间：{$sign_time},send weixin:{$wx_send_rs}");
                 }
@@ -136,8 +136,8 @@ class Sign {
                     $wx_send_rs = '';
                     if (isset($account['open_id'])) {
                         $his_sign_time = date('H:i:s', strtotime($sign_time));
-                        $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
-                        $wx_send_rs = json_encode($wx_send_rs);
+                        #$wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "计划签到", "计划：{$his_sign_time}\n为了防止哪天没有签到，请每天都确保有推送通知哦！", "等待执行");
+                        #$wx_send_rs = json_encode($wx_send_rs);
                     }
                     $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 新增计划签到时间：{$sign_time}，send weixin:{$wx_send_rs}");
                 }
@@ -149,7 +149,7 @@ class Sign {
                         $sign_record[$account['id']] = true;
                         $wx_send_rs = '';
                         if (isset($account['open_id'])) {
-                            $day = (strtotime(date("Ymd", time() + 86400)) - strtotime(date('Ymd'))) / 86400;
+                            $day = (strtotime(date("Ymd", time() + 86400)) - strtotime('20181026')) / 86400;
                             $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "自动签到", "打卡成功", date('Y-m-d H:i:s') . "\n您已连续签到{$day}天了");
                         }
                         $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!send weixin:{$wx_send_rs}");
@@ -394,7 +394,7 @@ class Sign {
 
             foreach ($check_result as $key => $value) {
                 if (!isset($res[$key]) || $res[$key] != $value) {
-                    $result->message = "heartbeat key:{$key} is not set OR value not equal";
+                    $result->message = "heartbeat [key:{$key},value:{$value}] is not set OR value not equal";
                     $result->result = $res_txt;
                     return $result;
                 }
