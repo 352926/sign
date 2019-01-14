@@ -36,7 +36,7 @@ class Sign {
             $today = $day;
         }
 
-        $time_h = mt_rand(7, 13);
+        $time_h = mt_rand(9, 13);
         $time_h = $time_h < 10 ? "0{$time_h}" : $time_h;
         $time_i = mt_rand(0, 59);
         $time_i = $time_i < 10 ? "0{$time_i}" : $time_i;
