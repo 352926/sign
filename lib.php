@@ -241,8 +241,7 @@ class Sign {
 
         $userinfo = array();
         foreach ($this->accounts as $account) {
-
-            if ($account['title'] == '钓鱼人app') {
+            if ($account['title'] == '钓鱼人APP') {
                 $rs = $this->_curl_get('http://www.diaoyu.com/my/home', $account['header']);
                 @preg_match_all("/<div class=\"user-info-honor\"><span>等级：<i>([^<]*)<\/i><\/span><span>头衔：([^<]*)<\/span><\/div>/si", $rs, $matches);
                 $level = @$matches[1][0];
@@ -333,6 +332,145 @@ class Sign {
             return 0;
         }
         return false;
+    }
+
+    public function diaoyuren_result_check($account, $content) {
+        $res = json_decode($content);
+
+        if (empty($res->data->html)) {
+            send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "数据校验", "调用钓鱼人签到接口返回的数据\$res->data->html不存在或为空！", "需要去日志里查下原因哦");
+            $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 调用钓鱼人签到接口返回的数据\$res->data->html不存在或为空！content:{$content}");
+            return false;
+        }
+
+        $html = $res->data->html;
+
+        $id1_start_tag = '<ul class="calendar-date" data-id="1"';
+        $id1_end_tag = '</ul>';
+        $ul_id1_start_pos = strpos($html, $id1_start_tag);
+        $ul_id1_start_pos = strpos($html, '>', $ul_id1_start_pos) + 1;
+        $ul_id1_end_pos = strpos($html, $id1_end_tag, $ul_id1_start_pos);
+
+        $current_month = trim(substr($html, $ul_id1_start_pos, $ul_id1_end_pos - $ul_id1_start_pos));
+
+        if (empty($current_month)) {
+            return false;
+        }
+
+        $date_m = date('Ymd');
+
+        $sign_tag = "<span class=\"signed\" data-id='{$date_m}'>";
+        if (strpos($current_month, $sign_tag) === false) {
+            send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "数据校验失败", "签到接口返回数据中没有匹配到成功的特征“{$sign_tag}”！", "需要去日志里查下原因哦");
+            $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 签到接口返回数据中没有匹配到成功的特征“{$sign_tag}”！content:{$content}");
+            return false;
+        }
+
+        //到这一步基本可以确定今天的签到成功!
+
+        //接下来验证本月的漏签情况
+        $pattern = '/<li>([\n\w\s<=\'\-\">\/]+?)<\/li>/si';
+        // preg_match_all($pattern, $current_month, $matches);
+        $matches = $this->get_match_all($pattern, $current_month);
+
+        if (empty($matches) || empty($matches[1])) {
+            send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "历史签名数据校验失败", "签到接口返回数据正则匹配返回失败！", "需要去日志里查下原因哦");
+            $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 签到接口返回数据正则匹配返回失败！content:{$content}");
+            return false;
+        }
+
+        $weeks = $matches[1];
+
+        $sign_days = array();
+        $fetch_days = array();
+
+        foreach ($weeks as $k => $week) {
+            $days = explode(PHP_EOL, trim($week));
+            foreach ($days as $i => $day) {
+                $day = trim($day);
+
+                //$rs[0]:完整span内容,$rs[1]:class的值,$rs[2]:data-id的值,$rs[3]:对应的日期
+                $rs = $this->get_match('/<span(?:\s+class=\"([\w\-]+)\"(?:\s+data\-id=(?:\'|\")([\d]+)(?:\'|\"))*)*>(\d+)<\/span>/si', $day);
+                if (empty($rs) || !isset($rs[3])) {
+                    continue;
+                }
+
+                //上个月
+                $pre_month = date('Ym', strtotime(date('Ym01')) - 86400);
+                $this_month = date('Ym');
+                $next_month = date('Ym', strtotime(date('Ym30')) + 86400 * 5);
+
+                $d = $rs[3] < 10 ? '0' . $rs[3] : $rs[3];
+
+                #如果k为0，且日期大于24号，则认定此日期为上个月的
+                if ($k === 0 && $d > 24) {
+                    $date_ymd = $pre_month . $d;
+                } elseif ($k === count($weeks) - 1 && $d <= 7) {
+                    $date_ymd = $next_month . $d;
+                } else {
+                    $date_ymd = $this_month . $d;
+                }
+
+                if (date('Ymd') < $date_ymd) {
+                    //echo '> ' . $k . ' ' . $rs[3] . ' ' . $date_ymd . PHP_EOL;
+                    //未来的日期退出
+                    continue;
+                }
+
+                if ($rs[1] === 'text-gray') {
+                    //未签到，应该是上个月
+                    $sign_status = 0;//未签到
+                } elseif ($rs[1] === 'signed') {
+                    $sign_status = 1;//已签到
+                } elseif (empty($rs[1])) {
+                    //未签到
+                    $sign_status = 0;//未签到
+                } else {
+                    send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "历史签名数据校验异常", "签到接口返回数据有未知的class出现！Ymd:{$date_ymd},class:{$rs[1]}", "需要去日志里查下原因哦");
+                    $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 签到接口返回数据有未知的class出现！Ymd:{$date_ymd},class:{$rs[1]},content:{$content}");
+                    continue;
+                }
+
+                $sign_days[$date_ymd] = $sign_status;
+                $fetch_days[] = array(
+                    'date' => $date_ymd,
+                    'sign' => $sign_status
+                );
+            }
+        }
+
+        //print_r($sign_days);
+        //print_r($fetch_days);
+
+        $un_sign = array();
+        $check_history_day = 5;
+        for ($i = 1; $i <= $check_history_day; $i++) {
+            $tmp_ymd = date('Ymd', strtotime('-' . $i . ' days'));
+            if ($sign_days[$tmp_ymd] === 0) {
+                $un_sign[] = date('m月d日', strtotime($tmp_ymd));
+            }
+        }
+
+        $result = $un_sign ? $un_sign : true;
+
+        if (is_array($result)) {
+            send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "历史签到校验", implode('、', $un_sign) . ' 漏签', "以往{$check_history_day}天内有漏签！请自行前往检查！");
+            $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 以往{$check_history_day}天内有漏签的！未签到日期：" . json_encode($un_sign, JSON_UNESCAPED_UNICODE) . "content:{$content}");
+        }
+
+        return $result;
+    }
+
+    function get_match_all($pattern, $subject) {
+        $rs = preg_match_all($pattern, $subject, $matches);
+
+        return $rs ? $matches : $rs;
+    }
+
+    function get_match($pattern, $subject) {
+        $rs = preg_match($pattern, $subject, $matches);
+
+        return $rs ? $matches : $rs;
     }
 
     protected function _curl_post($url, $post, $headers = array(), $raw = false) {
@@ -438,6 +576,11 @@ class Sign {
                 return $result;
             }
         }
+
+        if (!empty($account['check_callback']) && method_exists($this, $account['check_callback'])) {
+            @$this->{$account['check_callback']}($account, $res_txt);
+        }
+
         $result->success = true;
         $result->result = $res_txt;
 
