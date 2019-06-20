@@ -150,7 +150,11 @@ class Sign {
                         $wx_send_rs = '';
                         if (isset($account['open_id'])) {
                             $day = (strtotime(date("Ymd", time() + 86400)) - strtotime('20181026')) / 86400;
-                            $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "自动签到", "打卡成功", date('Y-m-d H:i:s') . "\n您已连续签到{$day}天了");
+                            $callback_msg = '';
+                            if (!empty($result->callback_msg)) {
+                                $callback_msg = PHP_EOL . $result->callback_msg;
+                            }
+                            $wx_send_rs = send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "自动签到", "打卡成功{$callback_msg}", date('Y-m-d H:i:s') . "\n您已连续签到{$day}天了");
                         }
                         $this->logger("[id:{$account['id']},user:{$account['user']},{$account['title']}] 签到 成功!send weixin:{$wx_send_rs}");
 
@@ -336,15 +340,20 @@ class Sign {
 
     public function diaoyuren_result_check($account, $content) {
         $res = json_decode($content);
+        $result = new stdClass();
+        $result->success = false;
+        $result->message = '';
 
         if (empty($res->data->html)) {
             send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "数据校验", "调用钓鱼人签到接口返回的数据\$res->data->html不存在或为空！", "需要去日志里查下原因哦");
             $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 调用钓鱼人签到接口返回的数据\$res->data->html不存在或为空！content:{$content}");
-            return false;
+            $result->message = '钓鱼人签到接口返回的数据$res->data->html不存在或为空！';
+            return $result;
         }
 
         $html = $res->data->html;
 
+        //方法一：使用strpos字符串查找“特征标识”来框小范围
         $id1_start_tag = '<ul class="calendar-date" data-id="1"';
         $id1_end_tag = '</ul>';
         $ul_id1_start_pos = strpos($html, $id1_start_tag);
@@ -353,8 +362,13 @@ class Sign {
 
         $current_month = trim(substr($html, $ul_id1_start_pos, $ul_id1_end_pos - $ul_id1_start_pos));
 
+        //方法二：使用正则来匹配
+        // (?:<li>)([\w\<\s\"\'\>\d\/\-\=]+?)\s*(?:<\/li>)
+        // (?:<li>)([\s\S]+?)\s*(?:<\/li>)
+
         if (empty($current_month)) {
-            return false;
+            $result->message = '钓鱼人签到接口返回的数据匹配出的当月日历数据为空！';
+            return $result;
         }
 
         $date_m = date('Ymd');
@@ -363,20 +377,23 @@ class Sign {
         if (strpos($current_month, $sign_tag) === false) {
             send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "数据校验失败", "签到接口返回数据中没有匹配到成功的特征“{$sign_tag}”！", "需要去日志里查下原因哦");
             $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 签到接口返回数据中没有匹配到成功的特征“{$sign_tag}”！content:{$content}");
-            return false;
+            $result->message = '签到接口返回数据中没有匹配到成功的特征“{$sign_tag}”！';
+            return $result;
         }
 
         //到这一步基本可以确定今天的签到成功!
 
         //接下来验证本月的漏签情况
         $pattern = '/<li>([\n\w\s<=\'\-\">\/]+?)<\/li>/si';
+        //$pattern = '/<li>([\s\S]+?)<\/li>/si';
         // preg_match_all($pattern, $current_month, $matches);
         $matches = $this->get_match_all($pattern, $current_month);
 
         if (empty($matches) || empty($matches[1])) {
             send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "历史签名数据校验失败", "签到接口返回数据正则匹配返回失败！", "需要去日志里查下原因哦");
             $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 签到接口返回数据正则匹配返回失败！content:{$content}");
-            return false;
+            $result->message = '签到接口返回数据正则匹配返回失败！';
+            return $result;
         }
 
         $weeks = $matches[1];
@@ -451,11 +468,14 @@ class Sign {
             }
         }
 
-        $result = $un_sign ? $un_sign : true;
 
-        if (is_array($result)) {
+        if ($un_sign) {
+            $result->message = implode('、', $un_sign) . ' 签到失败';
             send_notice($account['open_id'], "{$account['title']} - {$account['user']}", "历史签到校验", implode('、', $un_sign) . ' 漏签', "以往{$check_history_day}天内有漏签！请自行前往检查！");
             $this->logger("id:{$account['id']},user:{$account['user']},title:[{$account['title']}] 以往{$check_history_day}天内有漏签的！未签到日期：" . json_encode($un_sign, JSON_UNESCAPED_UNICODE) . "content:{$content}");
+        } else {
+            $result->success = true;
+            $result->message = '没有发现漏签';
         }
 
         return $result;
@@ -578,7 +598,9 @@ class Sign {
         }
 
         if (!empty($account['check_callback']) && method_exists($this, $account['check_callback'])) {
-            @$this->{$account['check_callback']}($account, $res_txt);
+            $callback_result = @$this->{$account['check_callback']}($account, $res_txt);
+
+            $result->callback_msg = $callback_result->message;
         }
 
         $result->success = true;
