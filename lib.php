@@ -422,7 +422,8 @@ class Sign {
                 #如果k为0，且日期大于24号，则认定此日期为上个月的
                 if ($k === 0 && $d > 24) {
                     $date_ymd = $pre_month . $d;
-                } elseif ($k === count($weeks) - 1 && $d <= 7) {
+                } elseif (($k === count($weeks) - 2 && $d <= 7) || ($k === count($weeks) - 1 && $d <= 14)) {
+                    #倒数两行，一行是最大7，最后一行最大14，都为下个月的
                     $date_ymd = $next_month . $d;
                 } else {
                     $date_ymd = $this_month . $d;
@@ -463,7 +464,7 @@ class Sign {
         $check_history_day = 5;
         for ($i = 1; $i <= $check_history_day; $i++) {
             $tmp_ymd = date('Ymd', strtotime('-' . $i . ' days'));
-            if ($sign_days[$tmp_ymd] === 0) {
+            if (isset($sign_days[$tmp_ymd]) && $sign_days[$tmp_ymd] === 0) {
                 $un_sign[] = date('m月d日', strtotime($tmp_ymd));
             }
         }
