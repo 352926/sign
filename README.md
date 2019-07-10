@@ -31,6 +31,7 @@ return array(
             'Cache-Control: no-cache',
         ),
         'check_result' => array('message' => 'success', 'code' => 1),//当返回结果里 message的值为success,code的值为1的时候请求表示成功
+        'check_callback' => 'xxx_callback',
         'params' => array(),//post 参数
     ),
 
@@ -45,4 +46,22 @@ mkdir log
 /usr/bin/php /home/dd/sign/sign.php &> /dev/null &
 tail -f log/sign.log-20180330
 ```
+
+### 2019-06-19 changelog
+增加调用签到接口后callback函数，可用于二次检查是否签到成功。
+
+具体配置项目：check_callback => xxx_callback
+
+xxx_callback 方法为内部成员方法，请确定 $this->xxx_callback() 可用
+
+### 2019-07-10 changelog
+为了提高稳定性，建议在crontab里加入 每天重启任务
+```
+#每天7点钟启动一次签到系统，防止异常退出的问题
+0 7 * * * /bin/sh /home/dd/sign/start.sh &
+```
+
+start.sh 启动的主要目的是先结束进程，再启动
+
+如果进程长时间运行不重启可能会因不可控导致进程死掉而不退出，因此建议每天重启一次。
 
